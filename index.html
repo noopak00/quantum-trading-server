@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QUANTUM TRADER — Real-time AI Signal Engine</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #020812;
+    --panel: rgba(0,200,255,0.03);
+    --border: rgba(0,200,255,0.15);
+    --cyan: #00c8ff;
+    --green: #00ff88;
+    --red: #ff3355;
+    --yellow: #ffcc00;
+    --purple: #b44aff;
+    --text: #a8d4e6;
+    --dim: #3a5a6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(0,200,255,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(180,74,255,0.04) 0%, transparent 50%);
+    z-index: 0;
+    pointer-events: none;
+    animation: drift 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift { from { transform: translate(0,0); } to { transform: translate(2%, 2%); } }
+
+  .container { position: relative; z-index: 1; padding: 16px; max-width: 1400px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    background: rgba(0,200,255,0.02);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: 0 0 20px rgba(0,200,255,0.5);
+    letter-spacing: 3px;
+  }
+
+  .logo span { color: var(--purple); }
+
+  .status-bar { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+
+  .status-item {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .status-item.api-error .dot { background: var(--red); }
+  .status-item.api-loading .dot { background: var(--yellow); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .time-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.5;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .quick-picks { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .pick-btn {
+    background: rgba(0,200,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .pick-btn:hover {
+    background: rgba(0,200,255,0.15);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .stock-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .ctrl-group label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .ctrl-group input, .ctrl-group select {
+    background: rgba(0,200,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    outline: none;
+    min-width: 120px;
+  }
+
+  .ctrl-group input:focus, .ctrl-group select:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,200,255,0.2);
+  }
+
+  .ctrl-group select option { background: #020812; }
+
+  .analyze-btn {
+    background: linear-gradient(135deg, rgba(0,200,255,0.2), rgba(180,74,255,0.2));
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    padding: 10px 28px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .analyze-btn:hover:not(.loading) {
+    background: linear-gradient(135deg, rgba(0,200,255,0.35), rgba(180,74,255,0.35));
+    box-shadow: 0 0 25px rgba(0,200,255,0.4);
+    transform: translateY(-1px);
+  }
+
+  .analyze-btn.loading { pointer-events: none; opacity: 0.6; }
+
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-full { grid-column: 1 / -1; }
+
+  .big-signal { text-align: center; padding: 10px 0; }
+
+  .signal-badge {
+    display: inline-block;
+    font-family: 'Orbitron', monospace;
+    font-size: 32px;
+    font-weight: 900;
+    padding: 14px 40px;
+    border-radius: 4px;
+    letter-spacing: 4px;
+    margin-bottom: 12px;
+    transition: all 0.5s;
+  }
+
+  .signal-badge.BUY {
+    color: var(--green);
+    border: 2px solid var(--green);
+    background: rgba(0,255,136,0.1);
+    box-shadow: 0 0 30px rgba(0,255,136,0.3), inset 0 0 30px rgba(0,255,136,0.08);
+    animation: buyPulse 2s ease-in-out infinite;
+  }
+
+  .signal-badge.SELL {
+    color: var(--red);
+    border: 2px solid var(--red);
+    background: rgba(255,51,85,0.1);
+    box-shadow: 0 0 30px rgba(255,51,85,0.3), inset 0 0 30px rgba(255,51,85,0.08);
+    animation: sellPulse 2s ease-in-out infinite;
+  }
+
+  .signal-badge.HOLD {
+    color: var(--yellow);
+    border: 2px solid var(--yellow);
+    background: rgba(255,204,0,0.1);
+    box-shadow: 0 0 30px rgba(255,204,0,0.2);
+  }
+
+  .signal-badge.WAIT {
+    color: var(--dim);
+    border: 2px solid var(--dim);
+    background: rgba(58,90,106,0.08);
+  }
+
+  @keyframes buyPulse {
+    0%,100% { box-shadow: 0 0 30px rgba(0,255,136,0.3), inset 0 0 30px rgba(0,255,136,0.08); }
+    50% { box-shadow: 0 0 50px rgba(0,255,136,0.5), inset 0 0 40px rgba(0,255,136,0.15); }
+  }
+
+  @keyframes sellPulse {
+    0%,100% { box-shadow: 0 0 30px rgba(255,51,85,0.3), inset 0 0 30px rgba(255,51,85,0.08); }
+    50% { box-shadow: 0 0 50px rgba(255,51,85,0.5), inset 0 0 40px rgba(255,51,85,0.15); }
+  }
+
+  .confidence-meter { margin: 12px 0; }
+
+  .conf-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+
+  .conf-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s ease;
+    background: var(--dim);
+  }
+
+  #priceChart { width: 100%; height: 320px; display: block; }
+
+  .chart-info {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .chart-stat { display: flex; flex-direction: column; gap: 2px; }
+
+  .chart-stat .val {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    color: var(--cyan);
+  }
+
+  .chart-stat .lbl { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,200,255,0.06);
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+  .metric-name { font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+  .metric-val { font-family: 'Share Tech Mono', monospace; font-size: 13px; }
+
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+
+  .indicators-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .indicator-chip {
+    background: rgba(0,200,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .ic-name { font-size: 10px; color: var(--dim); letter-spacing: 1px; margin-bottom: 4px; }
+  .ic-val { font-family: 'Orbitron', monospace; font-size: 14px; }
+  .ic-sig { font-size: 10px; letter-spacing: 1px; margin-top: 2px; }
+
+  .reason-box {
+    background: rgba(0,200,255,0.04);
+    border-left: 3px solid var(--cyan);
+    padding: 12px 14px;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .reason-box strong {
+    color: var(--cyan);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+  }
+
+  .loader { display: none; text-align: center; padding: 40px 20px; }
+  .loader.active { display: block; }
+
+  .loader-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    letter-spacing: 3px;
+    animation: blink 1s step-end infinite;
+    margin: 16px 0;
+  }
+
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  .scan-line {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    animation: scan 1.5s linear infinite;
+    margin: 10px 0;
+  }
+
+  @keyframes scan { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  .log-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,200,255,0.05);
+    font-size: 12px;
+  }
+
+  .log-time { font-family: 'Share Tech Mono', monospace; color: var(--dim); white-space: nowrap; }
+
+  .log-signal {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+
+  .log-signal.BUY { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+  .log-signal.SELL { background: rgba(255,51,85,0.15); color: var(--red); border: 1px solid rgba(255,51,85,0.3); }
+  .log-signal.HOLD { background: rgba(255,204,0,0.15); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+
+  .log-ticker { color: var(--cyan); font-weight: 700; }
+
+  .error-box {
+    background: rgba(255,51,85,0.1);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 12px 16px;
+    border-radius: 3px;
+    margin-top: 12px;
+    font-size: 12px;
+    display: none;
+  }
+
+  .error-box.show { display: block; }
+
+  .watermark {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: rgba(0,200,255,0.15);
+    letter-spacing: 4px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stock-controls { flex-direction: column; align-items: stretch; }
+    .ctrl-group { width: 100%; }
+    .analyze-btn { width: 100%; margin-top: 10px; }
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">QUANTUM<span>TRADER</span></div>
+  <div class="status-bar">
+    <div class="status-item" id="apiStatus"><span class="dot"></span>SERVER READY</div>
+    <div class="status-item">KR 🇰🇷 / US 🇺🇸</div>
+    <div class="time-display" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <div class="panel-title">실시간 퀀텀 분석 설정</div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px; color:var(--dim); letter-spacing:2px; margin-bottom:8px; font-family:'Share Tech Mono',monospace;">🇰🇷 한국 주식</div>
+      <div class="quick-picks">
+        <button class="pick-btn" onclick="setStock('삼성전자','KR')">삼성전자</button>
+        <button class="pick-btn" onclick="setStock('SK하이닉스','KR')">SK하이닉스</button>
+        <button class="pick-btn" onclick="setStock('현대차','KR')">현대차</button>
+        <button class="pick-btn" onclick="setStock('네이버','KR')">네이버</button>
+        <button class="pick-btn" onclick="setStock('카카오','KR')">카카오</button>
+        <button class="pick-btn" onclick="setStock('셀트리온','KR')">셀트리온</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px; color:var(--dim); letter-spacing:2px; margin-bottom:8px; font-family:'Share Tech Mono',monospace;">🇺🇸 미국 주식</div>
+      <div class="quick-picks">
+        <button class="pick-btn" onclick="setStock('AAPL','US')">AAPL</button>
+        <button class="pick-btn" onclick="setStock('MSFT','US')">MSFT</button>
+        <button class="pick-btn" onclick="setStock('NVDA','US')">NVDA</button>
+        <button class="pick-btn" onclick="setStock('TSLA','US')">TSLA</button>
+        <button class="pick-btn" onclick="setStock('GOOGL','US')">GOOGL</button>
+        <button class="pick-btn" onclick="setStock('AMZN','US')">AMZN</button>
+      </div>
+    </div>
+
+    <div class="stock-controls">
+      <div class="ctrl-group">
+        <label>시장</label>
+        <select id="market">
+          <option value="KR">🇰🇷 한국</option>
+          <option value="US">🇺🇸 미국</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>종목</label>
+        <input id="ticker" type="text" placeholder="예: 삼성전자, AAPL" value="삼성전자" />
+      </div>
+      <div class="ctrl-group">
+        <label>전략</label>
+        <select id="strategy">
+          <option value="momentum">모멘텀</option>
+          <option value="mean_revert">평균 회귀</option>
+          <option value="breakout">브레이크아웃</option>
+          <option value="quantum" selected>퀀텀 복합</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>리스크</label>
+        <select id="risk">
+          <option value="low">낮음</option>
+          <option value="mid" selected>중간</option>
+          <option value="high">높음</option>
+        </select>
+      </div>
+      <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">⚡ 실시간 분석</button>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-title">AI 신호</div>
+      <div class="big-signal">
+        <div class="signal-badge WAIT" id="mainSignal">WAIT</div>
+        <div style="font-size:13px; color:var(--text); margin:8px 0 14px;" id="signalDesc">실시간 데이터를 분석하세요</div>
+        <div class="confidence-meter">
+          <div class="conf-label">
+            <span>신뢰도</span>
+            <span id="confVal">--</span>
+          </div>
+          <div class="conf-bar">
+            <div class="conf-fill" id="confFill" style="width:0%;"></div>
+          </div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace; font-size:12px; margin-top:12px;">
+          <div style="margin-bottom:4px;">🎯 목표가: <span id="targetPrice" style="color:var(--green)">--</span></div>
+          <div>🛡️ 손절가: <span id="stopLoss" style="color:var(--red)">--</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">기술 지표</div>
+      <div class="indicators-grid">
+        <div class="indicator-chip">
+          <div class="ic-name">RSI (14)</div>
+          <div class="ic-val" id="ind-rsi" style="color:var(--dim)">--</div>
+          <div class="ic-sig" id="ind-rsi-sig" style="color:var(--dim)">대기</div>
+        </div>
+        <div class="indicator-chip">
+          <div class="ic-name">SMA 20/50</div>
+          <div class="ic-val" id="ind-sma" style="color:var(--dim)">--</div>
+          <div class="ic-sig" id="ind-sma-sig" style="color:var(--dim)">대기</div>
+        </div>
+        <div class="indicator-chip">
+          <div class="ic-name">모멘텀</div>
+          <div class="ic-val" id="ind-mom" style="color:var(--dim)">--</div>
+          <div class="ic-sig" id="ind-mom-sig" style="color:var(--dim)">대기</div>
+        </div>
+        <div class="indicator-chip">
+          <div class="ic-name">변동성</div>
+          <div class="ic-val" id="ind-vol" style="color:var(--dim)">--</div>
+          <div class="ic-sig" id="ind-vol-sig" style="color:var(--dim)">대기</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel grid-full">
+      <div class="panel-title">가격 차트 (최근 60일)</div>
+      <div id="loader" class="loader">
+        <div class="scan-line"></div>
+        <div class="loader-text">📊 실시간 데이터 분석 중...</div>
+        <div class="scan-line"></div>
+      </div>
+      <canvas id="priceChart"></canvas>
+      <div class="chart-info">
+        <div class="chart-stat">
+          <div class="val" id="currentPrice">--</div>
+          <div class="lbl">현재가</div>
+        </div>
+        <div class="chart-stat">
+          <div class="val" id="priceChange">--</div>
+          <div class="lbl">변화율</div>
+        </div>
+        <div class="chart-stat">
+          <div class="val" id="high52w">--</div>
+          <div class="lbl">52주 최고</div>
+        </div>
+        <div class="chart-stat">
+          <div class="val" id="volume">--</div>
+          <div class="lbl">거래량</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">퀀텀 지표</div>
+      <div class="metric-row"><span class="metric-name">RSI</span><span class="metric-val" id="m-rsi">--</span></div>
+      <div class="metric-row"><span class="metric-name">트렌드</span><span class="metric-val" id="m-trend">--</span></div>
+      <div class="metric-row"><span class="metric-name">변동성</span><span class="metric-val" id="m-volatility">--</span></div>
+      <div class="metric-row"><span class="metric-name">모멘텀</span><span class="metric-val" id="m-momentum">--</span></div>
+      <div class="metric-row"><span class="metric-name">SMA20</span><span class="metric-val" id="m-sma20">--</span></div>
+      <div class="metric-row"><span class="metric-name">SMA50</span><span class="metric-val" id="m-sma50">--</span></div>
+      <div class="metric-row"><span class="metric-name">매수스코어</span><span class="metric-val" id="m-buy">--</span></div>
+      <div class="metric-row"><span class="metric-name">매도스코어</span><span class="metric-val" id="m-sell">--</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">신호 히스토리</div>
+      <div id="signalLog" style="max-height:300px; overflow-y:auto;">
+        <div style="text-align:center; color:var(--dim); font-size:12px; padding:40px 0;">
+          분석 실행 시 기록됨
+        </div>
+      </div>
+    </div>
+
+    <div class="panel grid-full">
+      <div class="panel-title">분석 리포트</div>
+      <div class="reason-box" id="reasonBox">
+        <strong>분석 대기중</strong>
+        <p style="margin-top:6px; color:var(--dim);">백엔드 서버와 실시간 데이터 API 연동 완료. 종목을 선택하고 분석을 실행하세요.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="watermark">QUANTUM TRADING ENGINE • REAL-TIME ANALYSIS • BACKEND POWERED</div>
+</div>
+
+<script>
+// ================ CONFIG ================
+// 이 부분을 Render 배포 후 서버 URL로 변경하세요
+const BACKEND_URL = 'http://localhost:3000'; // 로컬 테스트용
+// 배포 후: const BACKEND_URL = 'https://your-app-name.onrender.com';
+
+// ================ UI ================
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function setStock(ticker, market) {
+  document.getElementById('ticker').value = ticker;
+  document.getElementById('market').value = market;
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = '⚠️ ' + msg;
+  box.classList.add('show');
+}
+
+function formatPrice(value, currency = '₩') {
+  const num = Number(value);
+  if (isNaN(num)) return '--';
+  if (currency === '₩') return '₩' + Math.round(num).toLocaleString('ko-KR');
+  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ================ CHART ================
+let chartCtx;
+
+function initChart() {
+  const canvas = document.getElementById('priceChart');
+  chartCtx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = 320;
+}
+
+function drawChart(data) {
+  if (!chartCtx || !data || data.length === 0) return;
+
+  const canvas = document.getElementById('priceChart');
+  const W = canvas.width, H = canvas.height;
+  chartCtx.clearRect(0, 0, W, H);
+
+  const closes = data.map(d => typeof d === 'number' ? d : d.close);
+  const minP = Math.min(...closes) * 0.98;
+  const maxP = Math.max(...closes) * 1.02;
+
+  // Grid
+  chartCtx.strokeStyle = 'rgba(0,200,255,0.06)';
+  for (let i = 0; i <= 5; i++) {
+    const y = (H - 40) * (i / 5) + 10;
+    chartCtx.beginPath();
+    chartCtx.moveTo(0, y);
+    chartCtx.lineTo(W, y);
+    chartCtx.stroke();
+  }
+
+  const isUp = closes[closes.length - 1] >= closes[0];
+  const color = isUp ? '0,255,136' : '255,51,85';
+
+  // Price line
+  chartCtx.beginPath();
+  chartCtx.strokeStyle = `rgba(${color},0.95)`;
+  chartCtx.lineWidth = 2;
+  closes.forEach((p, i) => {
+    const x = (W / (closes.length - 1)) * i;
+    const y = H - 30 - ((p - minP) / (maxP - minP)) * (H - 50);
+    i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
+  });
+  chartCtx.stroke();
+}
+
+let signalHistory = [];
+
+function addLog(ticker, signal, confidence) {
+  const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  signalHistory.unshift({ time, ticker, signal, confidence });
+  if (signalHistory.length > 10) signalHistory.pop();
+
+  const html = signalHistory.map(s => `
+    <div class="log-item">
+      <span class="log-time">${s.time}</span>
+      <span class="log-signal ${s.signal}">${s.signal}</span>
+      <span class="log-ticker">${s.ticker}</span>
+      <span style="color:var(--dim); font-size:10px;">${s.confidence}%</span>
+    </div>
+  `).join('');
+
+  document.getElementById('signalLog').innerHTML = html;
+}
+
+// ================ ANALYSIS ================
+async function runAnalysis() {
+  const ticker = document.getElementById('ticker').value.trim();
+  const market = document.getElementById('market').value;
+  const strategy = document.getElementById('strategy').value;
+  const risk = document.getElementById('risk').value;
+
+  if (!ticker) {
+    showError('종목을 입력하세요');
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  const apiStatus = document.getElementById('apiStatus');
+  const errorBox = document.getElementById('errorBox');
+
+  btn.classList.add('loading');
+  btn.textContent = '⏳ 분석중...';
+  errorBox.classList.remove('show');
+  document.getElementById('loader').classList.add('active');
+  document.getElementById('priceChart').style.display = 'none';
+  apiStatus.classList.add('api-loading');
+
+  try {
+    // 실시간 데이터 로드
+    const endpoint = market === 'KR' ? `/api/stock/kr/${ticker}` : `/api/stock/us/${ticker}`;
+    const response = await fetch(BACKEND_URL + endpoint);
+
+    if (!response.ok) {
+      throw new Error('종목 데이터를 불러올 수 없습니다. 종목 명을 확인하세요.');
+    }
+
+    const { data: stockData } = await response.json();
+
+    if (!stockData.historicalData || stockData.historicalData.length < 14) {
+      throw new Error('데이터 부족: 최소 14일 데이터 필요');
+    }
+
+    // 백엔드에서 지표 계산
+    const analysisResponse = await fetch(BACKEND_URL + '/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prices: stockData.historicalData,
+        strategy,
+        risk
+      })
+    });
+
+    const result = await analysisResponse.json();
+
+    // UI 업데이트
+    const signalEl = document.getElementById('mainSignal');
+    const signalMap = { BUY: '📈 매수', SELL: '📉 매도', HOLD: '⏸ 관망' };
+    signalEl.textContent = signalMap[result.signal];
+    signalEl.className = 'signal-badge ' + result.signal;
+
+    document.getElementById('signalDesc').textContent = result.signal === 'BUY' ? '강한 매수 신호' : result.signal === 'SELL' ? '강한 매도 신호' : '관망 권고';
+
+    document.getElementById('confVal').textContent = result.confidence + '%';
+    const fillEl = document.getElementById('confFill');
+    fillEl.style.width = result.confidence + '%';
+    fillEl.style.background = result.confidence > 75 ? 'linear-gradient(90deg, var(--green), var(--cyan))' :
+                              result.confidence > 55 ? 'linear-gradient(90deg, var(--yellow), var(--cyan))' :
+                              'linear-gradient(90deg, var(--red), var(--yellow))';
+
+    const currency = market === 'KR' ? '₩' : '$';
+    const targetMult = result.signal === 'BUY' ? 1.08 : result.signal === 'SELL' ? 0.93 : 1.02;
+    const stopMult = result.signal === 'BUY' ? 0.96 : result.signal === 'SELL' ? 1.04 : 0.98;
+
+    document.getElementById('targetPrice').textContent = formatPrice(stockData.currentPrice * targetMult, currency);
+    document.getElementById('stopLoss').textContent = formatPrice(stockData.currentPrice * stopMult, currency);
+    document.getElementById('currentPrice').textContent = formatPrice(stockData.currentPrice, currency);
+    document.getElementById('priceChange').textContent = (stockData.changePercent >= 0 ? '+' : '') + stockData.changePercent.toFixed(2) + '%';
+    document.getElementById('priceChange').className = 'val ' + (stockData.changePercent >= 0 ? 'up' : 'down');
+    document.getElementById('high52w').textContent = formatPrice(stockData.high52w, currency);
+    document.getElementById('volume').textContent = (stockData.volume / 1000000).toFixed(1) + 'M';
+
+    // 지표 표시
+    const rsiColor = result.rsi > 70 ? 'var(--red)' : result.rsi < 30 ? 'var(--green)' : 'var(--yellow)';
+    document.getElementById('ind-rsi').textContent = result.rsi;
+    document.getElementById('ind-rsi').style.color = rsiColor;
+    document.getElementById('ind-rsi-sig').textContent = result.rsi > 70 ? '과매수' : result.rsi < 30 ? '과매도' : '중립';
+    document.getElementById('ind-rsi-sig').style.color = rsiColor;
+
+    document.getElementById('ind-sma').textContent = stockData.currentPrice > result.sma20 ? '상승' : '하강';
+    document.getElementById('ind-sma').style.color = stockData.currentPrice > result.sma20 ? 'var(--green)' : 'var(--red)';
+
+    document.getElementById('ind-mom').textContent = result.momentum.toFixed(2) + '%';
+    document.getElementById('ind-mom').style.color = result.momentum > 5 ? 'var(--green)' : result.momentum < -5 ? 'var(--red)' : 'var(--yellow)';
+
+    document.getElementById('ind-vol').textContent = result.volatility + '%';
+    document.getElementById('ind-vol').style.color = result.volatility > 50 ? 'var(--red)' : 'var(--yellow)';
+
+    // Quantum metrics
+    document.getElementById('m-rsi').textContent = result.rsi;
+    document.getElementById('m-rsi').style.color = rsiColor;
+
+    document.getElementById('m-trend').textContent = result.trend > 0 ? '📈 상승' : result.trend < 0 ? '📉 하락' : '➡️ 횡보';
+    document.getElementById('m-volatility').textContent = result.volatility + '%';
+    document.getElementById('m-momentum').textContent = (result.momentum >= 0 ? '+' : '') + result.momentum.toFixed(2) + '%';
+    document.getElementById('m-sma20').textContent = formatPrice(result.sma20, currency);
+    document.getElementById('m-sma50').textContent = formatPrice(result.sma50, currency);
+    document.getElementById('m-buy').textContent = result.buyScore;
+    document.getElementById('m-buy').style.color = result.buyScore > 50 ? 'var(--green)' : 'var(--dim)';
+    document.getElementById('m-sell').textContent = result.sellScore;
+    document.getElementById('m-sell').style.color = result.sellScore > 50 ? 'var(--red)' : 'var(--dim)';
+
+    // 리포트
+    document.getElementById('reasonBox').innerHTML = `
+      <strong>⚡ 실시간 퀀텀 분석 — ${ticker} (${market === 'KR' ? '한국' : '미국'})</strong>
+      <p style="margin-top:8px; color:var(--text);">
+        RSI ${result.rsi}는 ${result.rsi > 70 ? '과매수 구간' : result.rsi < 30 ? '과매도 구간' : '중립권'}이며,
+        현재가는 SMA20 ${stockData.currentPrice > result.sma20 ? '위' : '아래'}에 위치하고 있습니다.
+        모멘텀 ${result.momentum.toFixed(2)}%, 변동성 ${result.volatility}% 수준입니다.
+        매수 스코어 ${result.buyScore} vs 매도 스코어 ${result.sellScore}로 <strong style="color:var(--cyan)">${result.signal}</strong> 신호입니다.
+      </p>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); font-size:11px; color:var(--dim);">
+        데이터: ${new Date(stockData.timestamp).toLocaleTimeString('ko-KR')} | 신뢰도: ${result.confidence}% | 전략: ${strategy}
+      </div>
+    `;
+
+    // 차트
+    document.getElementById('loader').classList.remove('active');
+    document.getElementById('priceChart').style.display = 'block';
+    initChart();
+    drawChart(stockData.historicalData);
+
+    addLog(ticker, result.signal, result.confidence);
+
+    apiStatus.classList.remove('api-loading');
+    apiStatus.textContent = '✅ SERVER CONNECTED';
+
+  } catch (err) {
+    console.error(err);
+    showError(err.message);
+    document.getElementById('loader').classList.remove('active');
+    document.getElementById('priceChart').style.display = 'block';
+    apiStatus.classList.remove('api-loading');
+    apiStatus.classList.add('api-error');
+    apiStatus.textContent = '❌ SERVER ERROR';
+  }
+
+  btn.classList.remove('loading');
+  btn.textContent = '⚡ 실시간 분석';
+}
+
+window.addEventListener('load', () => {
+  initChart();
+});
+</script>
+</body>
+</html>
